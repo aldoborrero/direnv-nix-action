@@ -1,0 +1,17 @@
+# Created by https://www.toptal.com/developers/gitignore/api/node,direnv
+# Edit at https://www.toptal.com/developers/gitignore?templates=node,direnv
+
+### direnv ###
+.direnv
+
+### Node ###
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# End of https://www.toptal.com/developers/gitignore/api/node,direnv

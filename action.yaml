@@ -1,0 +1,14 @@
+name: "Install / Load direnv with nix"
+description: "Installs direnv with nix and sources .envrc"
+author: "Aldo Borrero"
+branding:
+  icon: play
+  color: blue
+inputs:
+  use_nix_profile:
+    description: "Set to 'true' to use 'nix profile' for installation, otherwise 'nix-env' will be used."
+    required: false
+    default: 'false'
+runs:
+  using: node20
+  main: index.js
