@@ -1,5 +1,5 @@
 {
-  description = "direnv-nix-action";
+  description = "direnv-nix-action / A Github Action that installs direnv using Nix";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -37,7 +37,10 @@
         inputs.devshell.flakeModule
       ];
 
-      systems = ["x86_64-linux"];
+      systems = [
+        "x86_64-darwin"
+        "x86_64-linux"
+      ];
 
       perSystem = {
         self',
@@ -62,13 +65,19 @@
 
         # DevShell
         devshells.default = {
-          name = "use-nix-action";
+          name = "direnv-nix-action";
           packages = with pkgs; [
             act
             nodejs_20
           ];
           env = [];
           commands = [
+            {
+              category = "test";
+              name = "act-check";
+              help = "Performs a check with act";
+              command = "act push";
+            }
             {
               category = "nix";
               name = "fmt";

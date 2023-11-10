@@ -9,6 +9,10 @@ inputs:
     description: "Set to 'true' to use 'nix profile' for installation, otherwise 'nix-env' will be used."
     required: false
     default: 'false'
+  nix_channel:
+    description: "Specifies the Nix channel to use to install direnv, defaulting to <nixpkgs>."
+    required: false
+    default: "nixpkgs"
 runs:
   using: node20
   main: index.js

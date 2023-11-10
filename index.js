@@ -1,32 +1,44 @@
 const core = require("@actions/core");
 const exec = require("@actions/exec");
 const io = require("@actions/io");
+const os = require("os");
 
 /**
- * Check if a given binary is installed and throw an error if it's not.
+ * Check if a given binary is installed.
  * @param {string} binaryName - The name of the binary to check.
- * @returns {Promise<void>} A promise indicating the completion of the check.
- * @throws {Error} Throws an error if the binary is not installed.
+ * @returns {Promise<boolean>} A promise that resolves to a boolean indicating if the binary is installed.
  */
 async function isBinaryInstalled(binaryName) {
-  const binaryPath = await io.which(binaryName, true);
-  if (!binaryPath) {
-    throw new Error(`${binaryName} binary is not installed.`);
+  try {
+    const binaryPath = await io.which(binaryName, false);
+    if (binaryPath) {
+      core.info(`${binaryName} binary is installed at ${binaryPath}.`);
+      return true;
+    } else {
+      core.info(`${binaryName} binary is not installed.`);
+      return false;
+    }
+  } catch (error) {
+    core.error(
+      `An error occurred while checking for ${binaryName}: ${error.message}`,
+    );
+    return false;
   }
 }
+
 /**
  * Install direnv using Nix.
  * @returns {Promise<void>} A promise indicating the completion of the installation.
  */
 async function installDirenv() {
-  core.info("Installing direnv...");
-  const useNixProfile = core.getInput("use_nix_profile") === "true";
+  const useNixProfile = core.getBooleanInput("use_nix_profile");
+  const nixChannel = core.getInput("nix_channel") || "nixpkgs";
   if (useNixProfile) {
     core.info("Installing direnv using nix profile...");
-    await exec.exec("nix", ["profile", "install", "nixpkgs#direnv"]);
+    await exec.exec("nix", ["profile", "install", `${nixChannel}#direnv`]);
   } else {
     core.info("Installing direnv using nix-env...");
-    await exec.exec("nix-env", ["-i", "direnv", "-f", "<nixpkgs>"]);
+    await exec.exec("nix-env", ["-f", `<${nixChannel}>`, "-i", "direnv"]);
   }
 }
 
@@ -35,7 +47,6 @@ async function installDirenv() {
  * @returns {Promise<void>} A promise indicating the completion of the operation.
  */
 async function allowEnvrc() {
-  core.info("Allowing .envrc...");
   await exec.exec("direnv", ["allow"]);
 }
 
@@ -52,7 +63,6 @@ async function exportEnvrc() {
       },
     },
   };
-  core.info("Exporting envrc...");
   await exec.exec("direnv", ["export", "json"], options);
   return JSON.parse(outputBuffer);
 }
@@ -64,9 +74,10 @@ async function exportEnvrc() {
 function setEnvironmentVariables(envs) {
   for (const [name, value] of Object.entries(envs)) {
     if (name === "PATH") {
-      core.info("Detected PATH in .envrc, appending to PATH...");
+      core.info("Detected PATH in .envrc, appending it to PATH...");
       core.addPath(value);
     } else {
+      core.info(`Exporting variable ${name} with value ${value}`);
       core.exportVariable(name, value);
     }
   }
@@ -74,20 +85,40 @@ function setEnvironmentVariables(envs) {
 
 // Action entrypoint
 async function main() {
-  await isBinaryInstalled("nix");
-
-  // Check if direnv is installed before attempting installation
-  try {
-    await isBinaryInstalled("direnv");
-    core.info("direnv is already installed.");
-  } catch (error) {
-    core.info(error.message);
-    await installDirenv();
+  // Nix binary check group
+  core.startGroup("Checking nix binary");
+  if (os.type() === "Linux" && os.release().includes("nixos")) {
+    core.info("Running on NixOS, skipping nix binary check.");
+  } else {
+    await isBinaryInstalled("nix");
   }
+  core.endGroup();
 
+  // Direnv installation group
+  core.startGroup("Checking direnv binary");
+  const isDirenvInstalled = await isBinaryInstalled("direnv");
+  if (!isDirenvInstalled) {
+    core.info("direnv is not installed, installing now...");
+    await installDirenv();
+  } else {
+    core.info("direnv is already installed. Skipping installation.");
+  }
+  core.endGroup();
+
+  // Envrc allowance group
+  core.startGroup("Allowing .envrc");
   await allowEnvrc();
+  core.endGroup();
+
+  // Envrc export group
+  core.startGroup("Exporting .envrc");
   const envs = await exportEnvrc();
+  core.endGroup();
+
+  // Environment variables setting group
+  core.startGroup("Setting environment variables");
   setEnvironmentVariables(envs);
+  core.endGroup();
 }
 
 // Run!
